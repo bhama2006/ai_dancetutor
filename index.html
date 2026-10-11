@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Dance Tutor</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000; --card:#0d0d12; --line:#22222c; --text:#f2f2f7; --muted:#9a9ab0;
+    --accent:#ff4d8d; --accent2:#7c5cff; --good:#2ecc71; --ok:#ffc233; --bad:#ff4d4f;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#000;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
+  header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+  h1{margin:0;font-size:1.7rem;letter-spacing:-.02em}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);margin:4px 0 0;font-size:.95rem}
+  .pill{font-size:.8rem;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+  .pill.ok{color:var(--good);border-color:#1f5c3a}
+  .pill.err{color:var(--bad);border-color:#6b2224}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:16px}
+  .btn{appearance:none;border:1px solid var(--line);background:#15151c;color:var(--text);padding:10px 16px;border-radius:10px;font-size:.95rem;cursor:pointer;font-weight:600}
+  .btn:hover:not(:disabled){border-color:#444466}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));border:none}
+  .btn.stop{background:#3a1520;border-color:#6b2224}
+  .toolbar label.opt{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.9rem}
+  select{background:#15151c;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px}
+  input[type=file]{display:none}
+  .grow{flex:1}
+
+  .stage{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.stage{grid-template-columns:1fr}}
+  .panel{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .tag{position:absolute;z-index:5;top:10px;left:10px;font-size:.72rem;font-weight:700;letter-spacing:.08em;background:rgba(0,0,0,.55);padding:4px 9px;border-radius:6px}
+  .box{position:relative;width:100%;aspect-ratio:4/3;background:#000}
+  .box video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;background:#000}
+  .flip{position:absolute;inset:0;transform:scaleX(-1)}
+  .flip canvas{position:absolute;inset:0;width:100%;height:100%}
+  .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted);z-index:2}
+  .progress{position:absolute;left:12px;right:12px;bottom:12px;z-index:4;background:rgba(0,0,0,.65);border-radius:10px;padding:10px}
+  .progress .track{height:8px;background:#2a2a3d;border-radius:99px;overflow:hidden}
+  .progress .bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .1s}
+  .progress span{display:block;margin-top:6px;font-size:.8rem;color:var(--muted)}
+
+  .badge{position:absolute;z-index:5;top:10px;right:10px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:10px;text-align:right;min-width:84px}
+  .badge small{display:block;font-size:.65rem;color:var(--muted);letter-spacing:.08em}
+  .badge b{font-size:1.6rem}
+  .countdown{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;font-size:6rem;font-weight:800;text-shadow:0 4px 30px rgba(0,0,0,.8);pointer-events:none}
+  .coach{position:absolute;z-index:5;left:10px;right:10px;bottom:10px;background:rgba(0,0,0,.65);border-radius:10px;padding:10px 12px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+  .coach .time{color:var(--ok);font-weight:600;white-space:nowrap}
+  .c-good{color:var(--good)} .c-ok{color:var(--ok)} .c-bad{color:var(--bad)} .c-muted{color:var(--muted)}
+
+  .below{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:820px){.below{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .card h3{margin:0 0 12px;font-size:1rem}
+  .joint{display:grid;grid-template-columns:96px 1fr 52px;gap:10px;align-items:center;margin:8px 0;font-size:.88rem}
+  .joint .track{height:10px;border-radius:99px;background:#24243a;overflow:hidden}
+  .joint .fill{height:100%;width:0;background:var(--muted);transition:width .15s,background .15s}
+  .joint .val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  ul.tips{margin:0;padding-left:18px;color:var(--muted);line-height:1.7;font-size:.92rem}
+
+  .modal{position:fixed;inset:0;z-index:50;background:rgba(5,5,12,.8);display:none;align-items:center;justify-content:center;padding:16px}
+  .modal.show{display:flex}
+  .modal-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;max-width:420px;width:100%;text-align:center}
+  .modal-card .big{font-size:3.4rem;font-weight:800;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .modal-card ul{list-style:none;padding:0;margin:14px 0;text-align:left;color:var(--muted)}
+  .modal-card li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+  .row{display:flex;gap:10px;justify-content:center;margin-top:10px}
+#intro{position:fixed;inset:0;z-index:100;background:#000;color:#fff;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;transition:opacity .7s,visibility .7s}
+#intro.hide{opacity:0;visibility:hidden;pointer-events:none}
+#intro.hide *{animation-play-state:paused!important}
+body.intro-open .wrap{display:none}
+.stage-bg{position:absolute;inset:0;overflow:hidden}
+.spot{position:absolute;top:-6vh;width:46vw;height:112vh;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0) 85%);clip-path:polygon(46% 0,54% 0,100% 100%,0 100%);filter:blur(10px);transform-origin:50% 0;animation:swayL 9s ease-in-out infinite}
+.spot.l{right:-1vw;width:40vw;animation-delay:-3s}
+.spot.r{right:-4vw;animation-name:swayR}
+@keyframes swayL{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(9deg)}}
+@keyframes swayR{0%,100%{transform:rotate(7deg)}50%{transform:rotate(-9deg)}}
+.floor{position:absolute;left:0;right:0;bottom:0;height:22vh;background:radial-gradient(60% 100% at 50% 100%,rgba(255,77,141,.28),rgba(124,92,255,.1) 55%,transparent 75%)}
+.floor::before{content:"";position:absolute;left:8%;right:8%;top:36%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)}
+
+/* dancers */
+.dancer{position:absolute;bottom:13.4vh;aspect-ratio:1/2;color:#fff;opacity:var(--o,.9);filter:drop-shadow(0 0 14px rgba(255,120,180,.45));animation:float var(--dur,6s) ease-in-out infinite;animation-delay:var(--delay,0s)}
+.dancer.leap{animation-name:leap}
+.dsvg{display:block;width:100%;height:100%;overflow:visible}
+.dsvg path{fill:none;stroke:currentColor;stroke-width:6;stroke-linecap:round}
+.dsvg .torso,.dsvg .tutu{fill:currentColor;stroke:none}
+.dsvg circle{fill:currentColor}
+.armL,.armR,.legS,.legW{transform-box:view-box;animation-duration:var(--dur,6s);animation-delay:var(--delay,0s);animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.armL{transform-origin:49px 50px;animation-name:armL}
+.armR{transform-origin:71px 50px;animation-name:armR}
+.legS{transform-origin:58px 116px;animation-name:legS}
+.legW{transform-origin:63px 116px;animation-name:legW}
+.leap .legS{animation-name:legSleap}
+.leap .legW{animation-name:legWleap}
+.pir .dsvg{animation:spin var(--spin,5s) ease-in-out infinite}
+.pir .armL,.pir .armR,.pir .legW,.pir .legS{animation:none}
+.pir .armL{transform:rotate(158deg)}
+.pir .armR{transform:rotate(-158deg)}
+.pir .legW{transform:rotate(-20deg)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.6vh)}}
+@keyframes leap{0%,100%{transform:translateY(0) rotate(0)}45%,55%{transform:translateY(-14vh) rotate(-6deg)}}
+@keyframes spin{0%,100%{transform:scaleX(1)}25%,75%{transform:scaleX(.12)}50%{transform:scaleX(-1)}}
+@keyframes armL{0%,100%{transform:rotate(25deg)}45%,55%{transform:rotate(160deg)}}
+@keyframes armR{0%,100%{transform:rotate(-25deg)}45%,55%{transform:rotate(-160deg)}}
+@keyframes legW{0%,100%{transform:rotate(-2deg)}45%,55%{transform:rotate(-78deg)}}
+@keyframes legS{0%,100%{transform:rotate(2deg)}45%,55%{transform:rotate(7deg)}}
+@keyframes legWleap{0%,100%{transform:rotate(-2deg)}45%,55%{transform:rotate(-62deg)}}
+@keyframes legSleap{0%,100%{transform:rotate(2deg)}45%,55%{transform:rotate(62deg)}}
+
+/* dust */
+#dust i{position:absolute;bottom:-10px;border-radius:50%;background:rgba(255,200,225,.7);animation:rise linear infinite}
+@keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:.8}100%{transform:translateY(-105vh) translateX(var(--x,0));opacity:0}}
+
+/* content */
+.inav{position:absolute;z-index:5;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(20px + env(safe-area-inset-top,0px)) 28px 0}
+.logo{letter-spacing:.2em;font-size:.78rem;color:#cfcfe0;font-weight:600}
+#navUser{display:flex;gap:12px;align-items:center;font-size:.9rem;color:#cfcfe0}
+.hero{position:relative;z-index:4;height:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;padding:84px 20px 9vh 8vw;max-width:640px;text-shadow:0 2px 24px rgba(0,0,0,.9)}
+.eyebrow{margin:0;letter-spacing:.35em;font-size:.72rem;color:#ff7aa8;font-weight:600}
+.hero h2{margin:14px 0;font-family:"Cormorant Garamond",Georgia,serif;font-weight:500;font-size:clamp(2.4rem,min(7vw,12vh),5.6rem);line-height:1}
+.hero h2 em{background:linear-gradient(90deg,#ff4d8d,#b18cff);-webkit-background-clip:text;background-clip:text;color:transparent;font-style:italic;text-shadow:none}
+.hero .itag{margin:0;color:#b9b9c9;max-width:520px;font-size:1.05rem;line-height:1.6}
+.hello{margin:14px 0 0;color:#ff8fb6;font-size:.95rem}
+.cta{display:flex;gap:14px;margin-top:26px;flex-wrap:wrap;justify-content:flex-start}
+.ibtn{appearance:none;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.04);color:#fff;padding:14px 32px;border-radius:999px;font-size:1rem;font-weight:600;cursor:pointer;backdrop-filter:blur(6px);transition:transform .2s,box-shadow .2s,border-color .2s}
+.ibtn:hover{transform:translateY(-2px);border-color:#fff}
+.ibtn.sm{padding:8px 18px;font-size:.85rem}
+.ibtn.primary{border:none;background:linear-gradient(90deg,#ff4d8d,#7c5cff);box-shadow:0 8px 32px rgba(255,77,141,.35)}
+.ibtn.primary:hover{box-shadow:0 10px 40px rgba(255,77,141,.55)}
+.link{background:none;border:none;color:#ff8fb6;cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+.feat{position:absolute;z-index:4;left:0;right:0;bottom:3vh;display:flex;gap:22px;justify-content:center;flex-wrap:wrap;color:#8c8ca2;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;padding:0 12px}
+.itoast{position:absolute;left:50%;bottom:11vh;transform:translateX(-50%);z-index:9;background:rgba(20,20,28,.94);border:1px solid #2a2a38;padding:10px 18px;border-radius:999px;font-size:.9rem;animation:fadeout 3.2s forwards}
+@keyframes fadeout{0%,80%{opacity:1}100%{opacity:0}}
+
+/* login */
+.lmodal{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.78);backdrop-filter:blur(6px);padding:16px}
+.lmodal.show{display:flex}
+.lcard{position:relative;width:100%;max-width:360px;background:#0c0c10;border:1px solid #23232e;border-radius:18px;padding:26px;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.lcard h3{margin:0 0 14px;font-family:"Cormorant Garamond",Georgia,serif;font-size:1.9rem;font-weight:500}
+.lcard input{width:100%;margin:6px 0;padding:12px 14px;border-radius:10px;border:1px solid #2a2a38;background:#14141b;color:#fff;font-size:.95rem}
+.lcard input:focus{outline:none;border-color:#ff4d8d}
+.lcard .ibtn{width:100%;margin-top:10px}
+.lcard .sw{margin:14px 0 0;color:#9a9ab0;font-size:.85rem;text-align:center}
+.lcard .note{color:#6f6f84;font-size:.72rem;margin:10px 0 0;text-align:center}
+.lcard .x{position:absolute;top:10px;right:14px;background:none;border:none;color:#9a9ab0;font-size:1.6rem;cursor:pointer}
+
+@media(max-width:700px){.dancer{right:-8vw!important;height:48vh!important;opacity:.4!important}.hero{align-items:center;text-align:center;padding:84px 20px 9vh;max-width:none}.cta{justify-content:center}.inav{padding-left:16px;padding-right:16px}}
+.inav .link{color:#cfcfe0;text-decoration:none;font-size:.9rem}
+@media(max-height:620px){.hero h2{margin:8px 0}.hero .itag{font-size:.92rem}.cta{margin-top:16px}.ibtn{padding:11px 26px}}
+@media(prefers-reduced-motion:reduce){#intro *{animation:none!important}}
+
+</style>
+</head>
+<body class="intro-open">
+<div id="intro">
+  <div class="stage-bg">
+    <div class="spot l"></div>
+    <div class="floor"></div>
+    <div id="dancers"></div>
+  </div>
+  <nav class="inav">
+    <span class="logo">◆ AI DANCE TUTOR</span>
+    <span id="navUser"></span>
+  </nav>
+  <main class="hero">
+    <h2>AI <em>Dance</em> Tutor</h2>
+    <p class="itag">Pick any routine, dance in front of your camera, and get instant feedback on every joint.</p>
+    <p class="hello" id="hello"></p>
+    <div class="cta">
+      <button class="ibtn primary" id="startIntro">Start dancing</button>
+    </div>
+  </main>
+</div>
+
+<div class="lmodal" id="login">
+  <form class="lcard" id="lform">
+    <button type="button" class="x" id="lClose" aria-label="Close">×</button>
+    <h3 id="lTitle">Welcome back</h3>
+    <input id="lName" type="text" placeholder="Your name" style="display:none">
+    <input id="lEmail" type="email" placeholder="Email" required>
+    <input id="lPass" type="password" placeholder="Password" required minlength="4">
+    <button class="ibtn primary" type="submit" id="lSubmit">Log in</button>
+    <p class="sw"><span id="lSwTxt">New here?</span> <button type="button" class="link" id="lSwitch">Create an account</button></p>
+    <p class="note">Demo login: only your name is kept, in this browser. No password is stored.</p>
+  </form>
+</div>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AI <span>Dance Tutor</span></h1>
+      <p class="sub">Dance along with a reference video and get live feedback on every joint.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center"><button class="btn" id="homeBtn" style="padding:6px 12px">⌂ Home</button><div class="pill" id="modelStatus">Loading AI model…</div></div>
+  </header>
+
+  <div class="toolbar">
+    <label class="btn" for="file">1. Choose reference video</label>
+    <input type="file" id="file" accept="video/*">
+    <button class="btn" id="camBtn">2. Turn on camera</button>
+    <button class="btn primary" id="startBtn" disabled>3. Start dancing</button>
+    <button class="btn stop" id="stopBtn" style="display:none">Stop</button>
+    <span class="opt" id="hint" style="color:var(--ok)"></span>
+    <span class="grow"></span>
+    <label class="opt">Speed
+      <select id="speed">
+        <option value="0.5">0.5× (slow practice)</option>
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1× (normal)</option>
+      </select>
+    </label>
+    <label class="opt"><input type="checkbox" id="mirror" checked> Mirror mode (my left = their right)</label>
+  </div>
+
+  <div class="stage">
+    <div class="panel">
+      <div class="tag">REFERENCE</div>
+      <div class="box" id="refBox">
+        <video id="ref" muted playsinline preload="auto"></video>
+        <div class="placeholder" id="refPlaceholder">Choose a short reference dance video<br>(one dancer, full body visible)</div>
+        <div class="progress" id="prog" style="display:none">
+          <div class="track"><div class="bar" id="progBar"></div></div>
+          <span id="progText"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="tag">YOU</div>
+      <div class="box" id="camBox">
+        <div class="flip">
+          <video id="cam" autoplay muted playsinline></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="placeholder" id="camPlaceholder">Turn on your camera and stand back so your whole body is in view</div>
+      </div>
+      <div class="badge"><small>SCORE</small><b id="score">–</b></div>
+      <div class="countdown" id="countdown"></div>
+      <div class="coach" id="coach"><span class="c-muted" id="coachText">Waiting to start</span><span class="time" id="timing"></span></div>
+    </div>
+  </div>
+
+  <div class="below">
+    <div class="card">
+      <h3>Joint accuracy</h3>
+      <div id="joints"></div>
+    </div>
+    <div class="card">
+      <h3>Tips for best results</h3>
+      <ul class="tips">
+        <li>Stand 2–3 metres from the camera, full body in frame.</li>
+        <li>Use good, even lighting and a plain background.</li>
+        <li>Wear fitted clothes so the AI can see your joints.</li>
+        <li>Keep the camera still and facing you.</li>
+        <li>Use 0.5× speed to learn a new move, then speed up.</li>
+        <li>Green = matching, yellow = close, red = needs work.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="summary">
+  <div class="modal-card">
+    <h2 style="margin:0 0 6px">Session complete</h2>
+    <div class="big" id="sumScore">0%</div>
+    <p id="sumVerdict" style="color:var(--muted);margin:4px 0"></p>
+    <ul id="sumJoints"></ul>
+    <div class="row">
+      <button class="btn primary" id="again">Try again</button>
+      <button class="btn" id="closeSum">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const intro = $("intro");
+
+  // ---- ballet dancers (SVG silhouettes, animated with CSS) ----
+  const SVG = '<svg class="dsvg" viewBox="0 0 120 240" aria-hidden="true">' +
+    '<g class="armL"><path d="M49 50Q33 72 40 98"/></g><g class="armR"><path d="M71 50Q87 72 80 98"/></g>' +
+    '<g class="legS"><path d="M58 116L58 226"/></g><g class="legW"><path d="M63 116L63 226"/></g>' +
+    '<path class="torso" d="M47 46Q60 40 73 46L67 104H53Z"/><path class="tutu" d="M14 110Q60 92 106 110Q60 128 14 110Z"/>' +
+    '<circle cx="60" cy="27" r="11"/><circle cx="60" cy="13" r="6"/></svg>';
+  const DANCERS = [
+    ["sway", "right:9vw;height:68vh;--dur:9s"]
+  ];
+  $("dancers").innerHTML = DANCERS.map(([c, s]) => `<div class="dancer ${c}" style="${s}">${SVG}</div>`).join("");
+
+
+  // ---- toast ----
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.className = "itoast"; t.textContent = msg;
+    intro.appendChild(t); setTimeout(() => t.remove(), 3300);
+  }
+
+  // ---- demo login (front-end only) ----
+  const KEY = "danceTutorUser";
+  const getUser = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } };
+  const setUser = u => { try { u ? localStorage.setItem(KEY, JSON.stringify(u)) : localStorage.removeItem(KEY); } catch (e) {} };
+  let user = getUser(), signup = false;
+
+  function render() {
+    const nav = $("navUser"); nav.textContent = "";
+    if (user) {
+      const hi = document.createElement("span"); hi.textContent = "Hi, " + user.name;
+      const out = document.createElement("button"); out.className = "ibtn sm"; out.textContent = "Log out";
+      out.onclick = () => { user = null; setUser(null); render(); };
+      nav.append(hi, out);
+    } else {
+      const b = document.createElement("button"); b.className = "link"; b.textContent = "Log in";
+      b.onclick = openLogin; nav.append(b);
+    }
+    $("hello").textContent = user ? "Welcome back, " + user.name + " ✨" : "";
+  }
+  function setMode(s) {
+    signup = s;
+    $("lTitle").textContent = s ? "Create account" : "Welcome back";
+    $("lSubmit").textContent = s ? "Sign up" : "Log in";
+    $("lName").style.display = s ? "" : "none";
+    $("lSwTxt").textContent = s ? "Already have an account?" : "New here?";
+    $("lSwitch").textContent = s ? "Log in" : "Create an account";
+  }
+  function openLogin() { setMode(false); $("login").classList.add("show"); $("lEmail").focus(); }
+  function closeLogin() { $("login").classList.remove("show"); }
+  $("lClose").onclick = closeLogin;
+  $("lSwitch").onclick = () => setMode(!signup);
+  $("login").addEventListener("click", e => { if (e.target.id === "login") closeLogin(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeLogin(); });
+  $("lform").addEventListener("submit", e => {
+    e.preventDefault();
+    const email = $("lEmail").value.trim();
+    const name = ($("lName").value.trim() || email.split("@")[0] || "dancer");
+    user = { name, email }; setUser(user);
+    $("lform").reset(); closeLogin(); render();
+  });
+
+  // ---- start / home ----
+  $("startIntro").onclick = () => {
+    if (!document.querySelector(".wrap")) { toast("In the full site this opens the dance tutor ✨"); return; }
+    intro.classList.add("hide"); document.body.classList.remove("intro-open");
+  };
+  const home = $("homeBtn");
+  if (home) home.onclick = () => { intro.classList.remove("hide"); document.body.classList.add("intro-open"); };
+
+  render();
+})();
+
+</script>
+<script type="module">
+
+// ---------- config ----------
+const SAMPLE_FPS = 12;     // reference analysis rate
+const WINDOW_S   = 0.4;    // timing tolerance (+/- seconds)
+const GOOD = 20, OK = 35, MAXD = 60;  // error thresholds in degrees
+const VIS_MIN = 0.5;
+
+// name, point A, vertex B, point C  (angle measured at B)
+const JOINTS = [
+  ["Left elbow", 11, 13, 15], ["Right elbow", 12, 14, 16],
+  ["Left shoulder", 13, 11, 23], ["Right shoulder", 14, 12, 24],
+  ["Left hip", 11, 23, 25], ["Right hip", 12, 24, 26],
+  ["Left knee", 23, 25, 27], ["Right knee", 24, 26, 28],
+];
+const NJ = JOINTS.length;
+const CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],
+              [23,25],[25,27],[24,26],[26,28],[27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];
+const COL = { good:"#2ecc71", ok:"#ffc233", bad:"#ff4d4f", none:"#9a9ab0" };
+
+// ---------- elements ----------
+const $ = id => document.getElementById(id);
+const refVideo = $("ref"), cam = $("cam"), overlay = $("overlay"), ctx = overlay.getContext("2d");
+const modelStatus = $("modelStatus");
+
+// ---------- helpers ----------
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const colorFor = e => isNaN(e) ? COL.none : e < GOOD ? COL.good : e < OK ? COL.ok : COL.bad;
+const classFor = e => e < GOOD ? "c-good" : e < OK ? "c-ok" : "c-bad";
+const swapLR = a => { const o = a.slice(); for (let i = 0; i < NJ; i += 2) { o[i] = a[i+1]; o[i+1] = a[i]; } return o; };
+
+function waitFor(el, ev) {
+  return new Promise((res, rej) => {
+    const ok = () => { el.removeEventListener("error", bad); res(); };
+    const bad = () => { el.removeEventListener(ev, ok); rej(new Error("Video error")); };
+    el.addEventListener(ev, ok, { once: true });
+    el.addEventListener("error", bad, { once: true });
+  });
+}
+
+function angleAt(a, b, c, w, h) {
+  const ax = (a.x - b.x) * w, ay = (a.y - b.y) * h;
+  const cx = (c.x - b.x) * w, cy = (c.y - b.y) * h;
+  const n = Math.hypot(ax, ay) * Math.hypot(cx, cy) + 1e-6;
+  return Math.acos(clamp((ax * cx + ay * cy) / n, -1, 1)) * 180 / Math.PI;
+}
+function anglesFrom(lms, w, h) {
+  const out = new Array(NJ).fill(NaN);
+  if (!lms) return out;
+  JOINTS.forEach(([, a, b, c], i) => {
+    const A = lms[a], B = lms[b], C = lms[c];
+    if (Math.min(A.visibility ?? 1, B.visibility ?? 1, C.visibility ?? 1) > VIS_MIN) out[i] = angleAt(A, B, C, w, h);
+  });
+  return out;
+}
+
+// ---------- joint HUD ----------
+const jointsEl = $("joints");
+const jointRows = JOINTS.map(([name]) => {
+  const row = document.createElement("div");
+  row.className = "joint";
+  row.innerHTML = `<span>${name}</span><div class="track"><div class="fill"></div></div><span class="val">–</span>`;
+  jointsEl.appendChild(row);
+  return { fill: row.querySelector(".fill"), val: row.querySelector(".val") };
+});
+function updateHud(userErrs) {
+  userErrs.forEach((e, i) => {
+    const r = jointRows[i];
+    if (isNaN(e)) { r.fill.style.width = "0%"; r.fill.style.background = COL.none; r.val.textContent = "–"; }
+    else { r.fill.style.width = (clamp(1 - e / MAXD, 0, 1) * 100) + "%"; r.fill.style.background = colorFor(e); r.val.textContent = Math.round(e) + "°"; }
+  });
+}
+
+// ---------- state ----------
+let imgLandmarker = null, vidLandmarker = null;
+let refAngles = [], refReady = false;
+let camOn = false, stream = null;
+let state = "idle";   // idle | analysing | preview | countdown | running
+let t0 = 0, speed = 1;
+let lastVT = -1, smooth = null, scoreEMA = null;
+let sessErr = [], sessScores = [];
+
+// ---------- load model (with fallbacks) ----------
+// Tries several CDNs, then a local ./mediapipe folder and ./pose_landmarker_lite.task if you add them.
+const VISION_BASES = [
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14",
+  "https://unpkg.com/@mediapipe/tasks-vision@0.10.14",
+  "https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14",
+  "./mediapipe",
+];
+const MODEL_URLS = [
+  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+  "./pose_landmarker_lite.task",
+];
+let pendingFile = null;
+
+async function makeLandmarker(PoseLandmarker, vision, modelUrl, mode) {
+  const opts = d => ({ baseOptions: { modelAssetPath: modelUrl, delegate: d }, runningMode: mode, numPoses: 1 });
+  try { return await PoseLandmarker.createFromOptions(vision, opts("GPU")); }
+  catch { return await PoseLandmarker.createFromOptions(vision, opts("CPU")); }
+}
+
+async function loadAI() {
+  let mod = null, base = null, why = "";
+  for (const b of VISION_BASES) {
+    try { mod = await import(b + "/vision_bundle.mjs"); base = b; break; }
+    catch (e) { why = "AI library: " + (e.message || e); console.warn("Library failed from", b, e); }
+  }
+  if (!mod) throw new Error(why);
+  const vision = await mod.FilesetResolver.forVisionTasks(base + "/wasm");
+  for (const m of MODEL_URLS) {
+    try {
+      imgLandmarker = await makeLandmarker(mod.PoseLandmarker, vision, m, "IMAGE");
+      vidLandmarker = await makeLandmarker(mod.PoseLandmarker, vision, m, "VIDEO");
+      return;
+    } catch (e) { why = "AI model: " + (e.message || e); console.warn("Model failed from", m, e); }
+  }
+  throw new Error(why);
+}
+
+loadAI().then(() => {
+  modelStatus.textContent = "AI model ready"; modelStatus.className = "pill ok";
+  updateButtons();
+  if (pendingFile) { const f = pendingFile; pendingFile = null; analyseFile(f); }
+}).catch(e => {
+  console.error(e);
+  modelStatus.textContent = "Could not load AI model: " + (e.message || e);
+  modelStatus.className = "pill err";
+  updateButtons();
+  $("refPlaceholder").style.display = "flex";
+  $("refPlaceholder").textContent = "The AI model could not be downloaded. Check your internet / firewall, or see the README note about hosting files locally.";
+});
+
+// ---------- reference analysis ----------
+$("file").addEventListener("change", ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  if (!imgLandmarker) {
+    pendingFile = file;
+    $("refPlaceholder").style.display = "flex";
+    $("refPlaceholder").textContent = "Waiting for the AI model to load…";
+    return;
+  }
+  analyseFile(file);
+});
+
+async function analyseFile(file) {
+  stopSession();
+  state = "analysing"; refReady = false; refAngles = [];
+  updateButtons();
+  $("refPlaceholder").style.display = "none";
+  const prog = $("prog"); prog.style.display = "block";
+  try {
+    refVideo.src = URL.createObjectURL(file);
+    await waitFor(refVideo, "loadedmetadata");
+    const vw = refVideo.videoWidth, vh = refVideo.videoHeight, dur = refVideo.duration;
+    if (!isFinite(dur) || !vw) throw new Error("Unreadable video");
+    $("refBox").style.aspectRatio = vw + "/" + vh;
+    const n = Math.floor(dur * SAMPLE_FPS);
+    for (let i = 0; i < n; i++) {
+      const t = i / SAMPLE_FPS;
+      if (Math.abs(refVideo.currentTime - t) > 1e-3) { refVideo.currentTime = t; await waitFor(refVideo, "seeked"); }
+      const r = imgLandmarker.detect(refVideo);
+      refAngles.push(anglesFrom(r.landmarks[0], vw, vh));
+      $("progBar").style.width = ((i + 1) / n * 100) + "%";
+      $("progText").textContent = `Analysing reference… ${i + 1}/${n} frames`;
+      if (i % 4 === 0) await new Promise(r => setTimeout(r));
+    }
+    // forward-fill missed detections
+    for (let i = 1; i < refAngles.length; i++)
+      for (let j = 0; j < NJ; j++) if (isNaN(refAngles[i][j])) refAngles[i][j] = refAngles[i-1][j];
+    const found = refAngles.filter(a => a.some(v => !isNaN(v))).length / Math.max(1, refAngles.length);
+    refVideo.currentTime = 0;
+    if (found < 0.3) {
+      $("progText").textContent = "Couldn't find a dancer in most frames. Try a clip with one full-body dancer.";
+      state = "idle";
+    } else {
+      refReady = true; prog.style.display = "none";
+      state = camOn ? "preview" : "idle";
+      setCoach("Reference ready" + (camOn ? "" : " – now turn on your camera"), "c-good");
+    }
+  } catch (e) {
+    console.error(e);
+    $("progText").textContent = "Could not read that video. Try an MP4 (H.264) file.";
+    state = "idle";
+  }
+  updateButtons();
+}
+
+// ---------- camera ----------
+$("camBtn").addEventListener("click", async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false });
+    cam.srcObject = stream;
+    await cam.play();
+    if (cam.readyState < 2) await waitFor(cam, "loadeddata").catch(() => {});
+    $("camBox").style.aspectRatio = (cam.videoWidth || 4) + "/" + (cam.videoHeight || 3);
+    $("camPlaceholder").style.display = "none";
+    camOn = true;
+    if (state === "idle" && refReady) state = "preview";
+    setCoach(refReady ? "Camera ready – press Start" : "Camera ready – choose a reference video", "c-good");
+    updateButtons();
+  } catch (e) {
+    console.error(e);
+    setCoach("Camera blocked. Allow camera access in your browser (needs HTTPS or localhost).", "c-bad");
+  }
+});
+
+// ---------- session control ----------
+function setCoach(text, cls) {
+  const el = $("coachText"); el.textContent = text; el.className = cls || "";
+}
+function updateButtons() {
+  const busy = state === "countdown" || state === "running";
+  $("startBtn").disabled = !(refReady && camOn) || busy || state === "analysing";
+  $("stopBtn").style.display = busy ? "inline-block" : "none";
+  $("startBtn").style.display = busy ? "none" : "inline-block";
+  $("camBtn").disabled = camOn;
+  const failed = modelStatus.classList.contains("err");
+  $("hint").textContent = busy ? "" :
+    failed ? "AI model failed to load" :
+    !vidLandmarker ? "Loading AI model…" :
+    state === "analysing" ? "Analysing reference video…" :
+    !refReady ? "Next: choose a reference video" :
+    !camOn ? "Next: turn on your camera" : "Ready – press Start dancing";
+  $("camBtn").textContent = camOn ? "Camera on ✓" : "2. Turn on camera";
+}
+function startSession() {
+  if (!(refReady && camOn)) return;
+  speed = parseFloat($("speed").value);
+  sessErr = []; sessScores = []; scoreEMA = null; smooth = null;
+  $("score").textContent = "–";
+  t0 = performance.now() + 3000;
+  state = "countdown";
+  refVideo.pause(); refVideo.currentTime = 0;
+  updateButtons();
+}
+function stopSession() {
+  if (state === "countdown" || state === "running") { state = camOn ? "preview" : "idle"; }
+  refVideo.pause();
+  $("countdown").style.display = "none";
+  updateButtons();
+}
+$("startBtn").addEventListener("click", startSession);
+$("stopBtn").addEventListener("click", () => { stopSession(); setCoach("Stopped", "c-muted"); });
+$("again").addEventListener("click", () => { $("summary").classList.remove("show"); startSession(); });
+$("closeSum").addEventListener("click", () => $("summary").classList.remove("show"));
+
+function finishSession() {
+  const mirrored = $("mirror").checked;
+  state = camOn ? "preview" : "idle";
+  refVideo.pause();
+  $("countdown").style.display = "none";
+  updateButtons();
+  if (!sessScores.length) { setCoach("No pose detected during the session", "c-bad"); return; }
+  const avg = sessScores.reduce((a, b) => a + b, 0) / sessScores.length;
+  // per-joint mean error, mapped back to the user's own joints
+  const mean = new Array(NJ).fill(NaN);
+  for (let j = 0; j < NJ; j++) {
+    const vals = sessErr.map(e => e[j]).filter(v => !isNaN(v));
+    if (vals.length) mean[mirrored ? (j ^ 1) : j] = vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  const worst = mean.map((v, i) => [i, v]).filter(x => !isNaN(x[1])).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  $("sumScore").textContent = Math.round(avg) + "%";
+  $("sumVerdict").textContent = avg >= 80 ? "Amazing! You nailed it." : avg >= 60 ? "Nice work — keep practising." : "Good start. Try the 0.5× speed to learn the moves.";
+  $("sumJoints").innerHTML = worst.length
+    ? "<li style='color:var(--text)'><b>Needs most work</b><span></span></li>" + worst.map(([i, v]) => `<li><span>${JOINTS[i][0]}</span><span>${Math.round(v)}° off</span></li>`).join("")
+    : "";
+  $("summary").classList.add("show");
+  setCoach("Session complete", "c-good");
+}
+
+// ---------- main loop ----------
+function draw(lms, userErrs, w, h) {
+  if (overlay.width !== w) { overlay.width = w; overlay.height = h; }
+  ctx.clearRect(0, 0, w, h);
+  if (!lms) return;
+  const lw = Math.max(2, w / 200);
+  ctx.lineWidth = lw; ctx.strokeStyle = "rgba(255,255,255,.75)";
+  for (const [a, b] of CONN) {
+    ctx.beginPath(); ctx.moveTo(lms[a].x * w, lms[a].y * h); ctx.lineTo(lms[b].x * w, lms[b].y * h); ctx.stroke();
+  }
+  JOINTS.forEach(([, , v], i) => {
+    ctx.beginPath(); ctx.arc(lms[v].x * w, lms[v].y * h, Math.max(6, w / 70), 0, Math.PI * 2);
+    ctx.fillStyle = state === "running" ? colorFor(userErrs[i]) : COL.none; ctx.fill();
+  });
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  if (!camOn || !vidLandmarker || cam.readyState < 2) return;
+  if (cam.currentTime === lastVT) return;
+  lastVT = cam.currentTime;
+
+  const w = cam.videoWidth, h = cam.videoHeight;
+  const res = vidLandmarker.detectForVideo(cam, performance.now());
+  const lms = res.landmarks[0] || null;
+  let live = anglesFrom(lms, w, h);
+
+  // light smoothing
+  if (!smooth) smooth = live.slice();
+  else smooth = smooth.map((s, i) => isNaN(live[i]) ? s : (isNaN(s) ? live[i] : 0.5 * live[i] + 0.5 * s));
+  live = smooth.slice();
+
+  const now = performance.now();
+  const mirrored = $("mirror").checked;
+  let userErrs = new Array(NJ).fill(NaN);
+
+  if (state === "countdown") {
+    const rem = (t0 - now) / 1000;
+    const cd = $("countdown");
+    if (rem > 0) { cd.style.display = "flex"; cd.textContent = Math.ceil(rem); setCoach("Get ready…", "c-ok"); }
+    else {
+      cd.style.display = "none";
+      state = "running";
+      refVideo.currentTime = 0; refVideo.playbackRate = speed;
+      refVideo.play().catch(() => {});
+    }
+  }
+
+  if (state === "running") {
+    const elapsed = (now - t0) / 1000 * speed;
+    const idx = Math.floor(elapsed * SAMPLE_FPS);
+    if (Math.abs(refVideo.currentTime - elapsed) > 0.4) refVideo.currentTime = elapsed;
+    if (idx >= refAngles.length) { finishSession(); draw(lms, userErrs, w, h); return; }
+
+    const cmp = mirrored ? swapLR(live) : live;   // cmp[j] lines up with reference joint j
+    const W = Math.max(1, Math.round(WINDOW_S * SAMPLE_FPS));
+    const lo = Math.max(0, idx - W), hi = Math.min(refAngles.length - 1, idx + W);
+    let best = -1, bestErr = Infinity;
+    for (let i = lo; i <= hi; i++) {
+      let s = 0, c = 0;
+      for (let j = 0; j < NJ; j++) { const a = refAngles[i][j], b = cmp[j]; if (!isNaN(a) && !isNaN(b)) { s += Math.abs(a - b); c++; } }
+      if (c >= 3 && s / c < bestErr) { bestErr = s / c; best = i; }
+    }
+
+    if (best >= 0) {
+      const errs = cmp.map((v, j) => Math.abs(refAngles[best][j] - v));
+      userErrs = errs.map((_, u) => errs[mirrored ? (u ^ 1) : u]);
+      const valid = errs.filter(e => !isNaN(e));
+      const s = valid.reduce((a, e) => a + clamp(1 - e / MAXD, 0, 1), 0) / valid.length * 100;
+      scoreEMA = scoreEMA == null ? s : 0.9 * scoreEMA + 0.1 * s;
+      sessErr.push(errs); sessScores.push(s);
+      $("score").textContent = Math.round(scoreEMA) + "%";
+
+      // feedback on the worst joint
+      let k = -1, worstE = -1;
+      errs.forEach((e, j) => { if (!isNaN(e) && e > worstE) { worstE = e; k = j; } });
+      if (worstE < GOOD) setCoach("Great match!", "c-good");
+      else {
+        const u = mirrored ? (k ^ 1) : k;
+        const action = cmp[k] < refAngles[best][k] ? "open / straighten" : "bend more";
+        setCoach(`${JOINTS[u][0]}: ${action} (~${Math.round(worstE)}°)`, classFor(worstE));
+      }
+      const off = (best - idx) / SAMPLE_FPS;
+      $("timing").textContent = Math.abs(off) > 0.15 ? (off < 0 ? "A bit late" : "A bit early") : "";
+    } else {
+      setCoach("Step back so your full body is visible", "c-bad");
+      $("timing").textContent = "";
+    }
+    updateHud(userErrs);
+  } else if (state !== "countdown") {
+    $("timing").textContent = "";
+  }
+
+  draw(lms, userErrs, w, h);
+}
+requestAnimationFrame(loop);
+updateButtons();
+</script>
+</body>
+</html>
